@@ -1,29 +1,40 @@
 # Requirements — physio-nudge
 
-Dieses Verzeichnis enthält die vollständigen Anforderungen für physio-nudge,
-die macOS-Menüleisten-App, die in konfigurierbaren Intervallen ein dezentes
-Ecken-Overlay mit kurzen GIF-Sequenzen für Dehn- und Physio-Übungen zeigt.
+This directory contains the complete requirements for physio-nudge, the
+macOS menu-bar app that presents cron-like, non-intrusive movement
+nudges: small corner overlays playing user-composable exercise profiles.
 
-## Dokumente
+The requirements were reworked in an interview with the key user and are
+written in English throughout (repository language: English).
 
-| # | Dokument | Inhalt |
-|---|----------|--------|
-| 01 | vision-und-zielgruppe.md | Problem, Vision, Zielgruppe, Erfolgsmaße |
-| 02 | wettbewerbsabgrenzung.md | Vergleich mit Time Out, Stretchly, LookAway; Positionierung |
-| 03 | funktionale-anforderungen.md | FR-Liste mit IDs, Prioritäten (MoSCoW), Akzeptanzkriterien |
-| 04 | overlay-ux-spec.md | **Verhaltens-Spec des Overlays** (das Herzstück) |
-| 05 | uebungs-inhalte.md | Übungsdatenmodell, GIF-Spezifikation, Content-Richtlinien |
-| 06 | konfiguration-und-daten.md | Konfigurationsschema, Speicherorte, zukünftige Settings |
-| 07 | nichtfunktionale-anforderungen.md | Performance, Privatsphäre, Robustheit, Barrierefreiheit |
-| 08 | technische-architektur.md | Architekturentscheidungen (NSPanel, ImageIO, SwiftPM) |
-| 09 | mvp-und-akzeptanzkriterien.md | MVP-Umfang und finale Abnahmeliste |
+## Documents
 
-## Empfohlene Lesereihenfolge
+| # | Document | Content |
+|---|----------|---------|
+| 01 | vision-and-target-audience.md | problem, vision, key user, success measures |
+| 02 | competitive-differentiation.md | comparison with Time Out, Stretchly, LookAway; positioning |
+| 03 | functional-requirements.md | FR list with IDs, MoSCoW priorities, acceptance criteria |
+| 04 | overlay-ux-spec.md | behavior spec of the overlay (the core) |
+| 05 | exercise-content-and-visuals.md | data model, GIF/start-end visuals, content guidelines |
+| 06 | configuration-and-data.md | JSON schemas (library, nudges), storage, clean removal |
+| 07 | non-functional-requirements.md | performance, privacy, robustness, accessibility |
+| 08 | technical-architecture.md | architecture decisions (NSPanel, ImageIO, scheduler, stores) |
+| 09 | mvp-and-acceptance-criteria.md | milestones M1–M3, MVP scope, acceptance checklist |
 
-01 → 03 → 04 → 05 (für Produktentscheidungen) bzw. zusätzlich
-02 → 06 → 07 → 08 → 09 (für Vollständigkeit).
+## Recommended Reading Order
 
-## Leitprinzip
+01 → 03 → 04 → 05 (product decisions) plus
+02 → 06 → 07 → 08 → 09 (completeness).
 
-> Der Nudge darf niemals stören, aber er darf auch nicht übersehen werden.
-> Alles, was den Nutzer unterbricht (Fokus, Flow, Meetings), ist ein Bug.
+## Guiding Principle
+
+> The nudge must never disturb, but it must not be overlooked either.
+> Anything that interrupts the user (focus, flow, meetings) is a bug.
+
+## Core Concepts
+
+- **Exercise** — atomic movement unit (reps or duration), with GIF or
+  start/end visual.
+- **Profile** — ordered sequence of 1..n exercises.
+- **Nudge** — schedule entry (cron-like) that presents one profile.
+- **Statistics** — completed exercises only; "No" leaves no trace.
