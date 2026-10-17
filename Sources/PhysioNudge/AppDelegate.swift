@@ -82,6 +82,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         libraryWindow?.reload()
         libraryWindow?.showWindow(self)
+        libraryWindow?.window?.center()
         NSApp.activate(ignoringOtherApps: true)
     }
 
@@ -95,6 +96,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         nudgeWindow?.reload()
         nudgeWindow?.showWindow(self)
+        nudgeWindow?.window?.center()
         NSApp.activate(ignoringOtherApps: true)
     }
 
@@ -103,6 +105,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             settingsWindow = SettingsWindowController()
         }
         settingsWindow?.showWindow(self)
+        settingsWindow?.window?.center()
         NSApp.activate(ignoringOtherApps: true)
     }
 
@@ -142,8 +145,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         overlayController = controller
 
         controller.present(header: profileName,
-                           items: items,
-                           autoDelaySeconds: 10) { [weak self] _ in
+                       items: items,
+                       autoDelaySeconds: 10) { [weak self] _ in
             self?.dismissOverlay()
             completion(false)
         }
