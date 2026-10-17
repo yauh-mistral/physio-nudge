@@ -61,7 +61,7 @@ final class SchedulerService {
     private var isPresenting = false
 
     /// Called by the service when a profile should be shown in the overlay.
-    var onPresent: ((Profile, [LibraryExercise]) -> Void)?
+    var onPresent: ((Profile) -> Void)?
 
     init(store: DataStore = .shared) {
         self.store = store
@@ -96,9 +96,8 @@ final class SchedulerService {
     }
 
     private func fire(nudge: Nudge) {
-        guard let profile = store.library.profile(id: nudge.profileId) else { return }
-        let exercises = store.library.exercises(in: profile)
-        guard !exercises.isEmpty else { return }
+        guard let profile = store.library.profile(id: nudge.profileId),
+              !profile.entries.isEmpty else { return }
         queue.enqueue(nudge)
         presentNextIfIdle()
     }
@@ -113,13 +112,13 @@ final class SchedulerService {
             isPresenting = false
             return
         }
-        guard let profile = store.library.profile(id: nudge.profileId) else {
+        guard let profile = store.library.profile(id: nudge.profileId),
+              !profile.entries.isEmpty else {
             presentNext()
             return
         }
-        let exercises = store.library.exercises(in: profile)
         isPresenting = true
-        onPresent?(profile, exercises)
+        onPresent?(profile)
     }
 
     /// Called by the UI when the current overlay finished/dismissed.

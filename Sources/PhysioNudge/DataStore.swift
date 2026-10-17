@@ -1,34 +1,33 @@
 import Foundation
 
-struct LibraryExercise: Codable {
+struct Exercise: Codable {
     var id: String
     var title: String
-    var caption: String
-    var gifs: [String]
+}
+
+/// One step inside a profile: an exercise plus its amount (reps) or time.
+struct ProfileEntry: Codable {
+    var exerciseId: String
     var reps: Int?
-    var durationSeconds: Int?
+    var seconds: Int?
 }
 
 struct Profile: Codable {
     var id: String
     var name: String
-    var exercises: [String]
+    var entries: [ProfileEntry]
 }
 
 struct ExerciseLibrary: Codable {
-    var exercises: [LibraryExercise]
+    var exercises: [Exercise]
     var profiles: [Profile]
 
-    func exercise(id: String) -> LibraryExercise? {
+    func exercise(id: String) -> Exercise? {
         exercises.first { $0.id == id }
     }
 
     func profile(id: String) -> Profile? {
         profiles.first { $0.id == id }
-    }
-
-    func exercises(in profile: Profile) -> [LibraryExercise] {
-        profile.exercises.compactMap { exercise(id: $0) }
     }
 }
 
@@ -42,7 +41,7 @@ struct Schedule: Codable {
     func summary() -> String {
         switch type {
         case "interval":
-            return "Every \(intervalMinutes ?? 0) min"
+            return "Every \(intervalMinutes ?? 60) min"
         case "hourly":
             return "Hourly \(fromTime ?? "?")–\(toTime ?? "?")"
         case "at":
@@ -131,6 +130,13 @@ struct AppSettings: Codable {
     var corner: String
 }
 
+/// One resolved playback item for the overlay: exercise title + amount.
+struct OverlayItem {
+    let title: String
+    let reps: Int?
+    let seconds: Int?
+}
+
 /// Loads and stores all app data as plain JSON in one Application Support
 /// folder (requirements/06, NFR-16: clean uninstall = delete one folder).
 final class DataStore {
@@ -156,12 +162,12 @@ final class DataStore {
         nudgesURL = directory.appendingPathComponent("nudges.json")
         settingsURL = directory.appendingPathComponent("settings.json")
 
-        library = Self.load(libraryURL)
-            ?? Self.defaultLibrary(seedFileAt: libraryURL)
-        nudges = Self.load(nudgesURL)
-            ?? Self.defaultNudges(seedFileAt: nudgesURL)
-        settings = Self.load(settingsURL)
-            ?? Self.defaultSettings(seedFileAt: settingsURL)
+        library = Self.load(libraryURL) ?? Self.seedLibrary()
+        if library.exercises.isEmpty && library.profiles.isEmpty {
+            library = Self.seedLibrary()
+        }
+        nudges = Self.load(nudgesURL) ?? Self.seedNudges()
+        settings = Self.load(settingsURL) ?? Self.seedSettings()
         persistLibrary()
         persistNudges()
         persistSettings()
@@ -182,46 +188,58 @@ final class DataStore {
 
     // MARK: - Seeds
 
-    private static func defaultLibrary(seedFileAt url: URL) -> ExerciseLibrary {
-        let library = ExerciseLibrary(
+    private static func seedLibrary() -> ExerciseLibrary {
+        ExerciseLibrary(
             exercises: [
-                LibraryExercise(id: "neck-yes", title: "Yes",
-                                caption: "Slowly nod your head: chin toward chest and back up.",
-                                gifs: [], reps: nil, durationSeconds: 30),
-                LibraryExercise(id: "neck-no", title: "No",
-                                caption: "Slowly turn your head left and right, keeping shoulders still.",
-                                gifs: [], reps: nil, durationSeconds: 30),
-                LibraryExercise(id: "neck-maybe", title: "Maybe",
-                                caption: "Tilt your ear toward your shoulder, alternating sides.",
-                                gifs: [], reps: nil, durationSeconds: 30)
+                Exercise(id: "head-nod", title: "Head Nod"),
+                Exercise(id: "head-shake", title: "Head Shake"),
+                Exercise(id: "ear-to-shoulder", title: "Ear to Shoulder")
             ],
             profiles: [
-                Profile(id: "cervical-mobility", name: "Cervical Mobility",
-                        exercises: ["neck-yes", "neck-no", "neck-maybe"])
+                Profile(id: "cervical-mobility", name: "Cervical Mobility", entries: [
+                    ProfileEntry(exerciseId: "head-nod", reps: 10, seconds: nil),
+                    ProfileEntry(exerciseId: "head-shake", reps: 10, seconds: nil),
+                    ProfileEntry(exerciseId: "ear-to-shoulder", reps: 10, seconds: nil)
+                ])
             ])
-        save(library, to: url)
-        return library
     }
 
-    private static func defaultNudges(seedFileAt url: URL) -> [Nudge] {
-        let nudges = [
+    private static func seedNudges() -> [Nudge] {
+        [
             Nudge(id: "hourly-cervical", name: "Hourly Cervical Mobility",
                   profileId: "cervical-mobility",
                   schedule: Schedule(type: "interval", intervalMinutes: 60,
                                      fromTime: nil, toTime: nil, times: nil),
                   enabled: true)
         ]
-        save(nudges, to: url)
-        return nudges
     }
 
-    private static func defaultSettings(seedFileAt url: URL) -> AppSettings {
-        let settings = AppSettings(corner: "bottomRight")
-        save(settings, to: url)
-        return settings
+    private static func seedSettings() -> AppSettings {
+        AppSettings(corner: "bottomRight")
     }
 
-    // MARK: - Mutation
+    // MARK: - Library mutation
+
+    func add(exercise: Exercise) {
+        library.exercises.append(exercise)
+        persistLibrary()
+    }
+
+    func add(profile: Profile) {
+        library.profiles.append(profile)
+        persistLibrary()
+    }
+
+    func update(profile: Profile) {
+        if let index = library.profiles.firstIndex(where: { $0.id == profile.id }) {
+            library.profiles[index] = profile
+        } else {
+            library.profiles.append(profile)
+        }
+        persistLibrary()
+    }
+
+    // MARK: - Nudges / settings mutation
 
     func persistLibrary() { Self.save(library, to: libraryURL) }
     func persistNudges() { Self.save(nudges, to: nudgesURL) }

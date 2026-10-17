@@ -15,10 +15,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupStatusItem()
 
-        schedulerService.onPresent = { [weak self] profile, exercises in
-            self?.present(profileName: profile.name, exercises: exercises)
+        schedulerService.onPresent = { [weak self] profile in
+            self?.present(profileName: profile.name, items: Self.overlayItems(for: profile))
         }
         schedulerService.start()
+    }
+
+    static func overlayItems(for profile: Profile) -> [OverlayItem] {
+        profile.entries.compactMap { entry in
+            guard let exercise = DataStore.shared.library.exercise(id: entry.exerciseId) else {
+                return nil
+            }
+            return OverlayItem(title: exercise.title, reps: entry.reps, seconds: entry.seconds)
+        }
     }
 
     // MARK: - Menu bar icon & menu
@@ -69,11 +78,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func openLibrary() {
         if libraryWindow == nil {
-            let controller = LibraryWindowController()
-            controller.onDoNow = { [weak self] exercise in
-                self?.present(exercise: exercise)
-            }
-            libraryWindow = controller
+            libraryWindow = LibraryWindowController()
         }
         libraryWindow?.reload()
         libraryWindow?.showWindow(self)
@@ -82,7 +87,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func openNudges() {
         if nudgeWindow == nil {
-            nudgeWindow = NudgeWindowController()
+            let controller = NudgeWindowController()
+            controller.onNewProfile = { [weak self] in
+                self?.openLibraryCreatingProfile()
+            }
+            nudgeWindow = controller
         }
         nudgeWindow?.reload()
         nudgeWindow?.showWindow(self)
@@ -97,6 +106,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
     }
 
+    /// Opens the Library and starts a fresh profile editor (jump target
+    /// for "New Profile…" in the nudge configuration).
+    private func openLibraryCreatingProfile() {
+        openLibrary()
+        libraryWindow?.beginNewProfile()
+    }
+
     // MARK: - Callbacks from windows
 
     func schedulerDidReschedule() {
@@ -105,32 +121,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Overlay presentation
 
-    private func present(profileName: String, exercises: [LibraryExercise]) {
-        guard overlayPanel == nil else {
-            // Another presentation is active; the queue drains on finish.
-            return
-        }
-        let corner = DataStore.shared.currentCorner
-        let panel = OverlayPanel(size: overlaySize, corner: corner)
-        let controller = OverlayViewController()
-        panel.contentViewController = controller
-        panel.present(at: corner)
-
-        overlayPanel = panel
-        overlayController = controller
-
-        controller.present(profileName: profileName,
-                           exercises: exercises,
-                           directory: DataStore.shared.directory,
-                           startMode: .auto,
-                           autoDelaySeconds: 10) { [weak self] _ in
-            self?.dismissOverlay()
+    private func present(profileName: String, items: [OverlayItem]) {
+        guard overlayPanel == nil else { return }
+        showOverlay(profileName: profileName, items: items) { [weak self] _ in
             self?.schedulerService.overlayDidFinish()
         }
     }
 
-    private func present(exercise: LibraryExercise) {
-        guard overlayPanel == nil else { return }
+    private func showOverlay(profileName: String,
+                             items: [OverlayItem],
+                             completion: @escaping (Bool) -> Void) {
+        guard !items.isEmpty else { return }
         let corner = DataStore.shared.currentCorner
         let panel = OverlayPanel(size: overlaySize, corner: corner)
         let controller = OverlayViewController()
@@ -140,12 +141,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         overlayPanel = panel
         overlayController = controller
 
-        controller.present(profileName: exercise.title,
-                           exercises: [exercise],
-                           directory: DataStore.shared.directory,
-                           startMode: .auto,
-                           autoDelaySeconds: 5) { [weak self] _ in
+        controller.present(header: profileName,
+                           items: items,
+                           autoDelaySeconds: 10) { [weak self] _ in
             self?.dismissOverlay()
+            completion(false)
         }
     }
 

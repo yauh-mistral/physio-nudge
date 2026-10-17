@@ -1,35 +1,24 @@
 import AppKit
 
-/// Presents one profile: title, caption, visual per exercise, sequential
-/// playback with reps/duration, then the "All done?" confirmation.
-/// Start modes: auto (countdown delay) or click (Start button).
+/// Presents a sequence of overlay items: title + amount, one after
+/// another, then the "All done?" confirmation. Auto start with countdown;
+/// "No" dismisses at any time.
 final class OverlayViewController: NSViewController {
     private let effectView = NSVisualEffectView()
     private let titleLabel = NSTextField(labelWithString: "")
-    private let captionLabel = NSTextField(wrappingLabelWithString: "")
     private let progressLabel = NSTextField(labelWithString: "")
     private let imageView = NSImageView()
-    private let startButton = NSButton(title: "Start", target: nil, action: nil)
     private let noButton = NSButton(title: "No", target: nil, action: nil)
     private let yesButton = NSButton(title: "Yes", target: nil, action: nil)
     private let buttonStack = NSStackView()
 
-    private var animator: GifAnimator?
     private var playbackTimer: Timer?
-    private var gifQueue: [URL] = []
-    private var gifDirectory: URL = URL(fileURLWithPath: "/")
+    private var countdownTimer: Timer?
     private var onCompletion: ((Bool) -> Void)?
 
-    private var profileName = ""
-    private var remainingExercises: [LibraryExercise] = []
-    private var startMode: StartMode = .auto
+    private var headerText = ""
+    private var remainingItems: [OverlayItem] = []
     private var countdownSeconds = 10
-    private var countdownTimer: Timer?
-
-    enum StartMode {
-        case auto
-        case click
-    }
 
     override func loadView() {
         effectView.material = .hudWindow
@@ -39,27 +28,26 @@ final class OverlayViewController: NSViewController {
         effectView.layer?.cornerRadius = 16
 
         imageView.imageScaling = .scaleProportionallyUpOrDown
-        titleLabel.font = NSFont.systemFont(ofSize: 14, weight: .semibold)
+        imageView.image = NSImage(systemSymbolName: "figure.flexibility",
+                                  accessibilityDescription: nil)
+        titleLabel.font = NSFont.systemFont(ofSize: 15, weight: .semibold)
         titleLabel.textColor = .white
-        captionLabel.font = NSFont.systemFont(ofSize: 12)
-        captionLabel.textColor = .lightGray
-        captionLabel.preferredMaxLayoutWidth = 260
-        captionLabel.alignment = .center
-        progressLabel.font = NSFont.systemFont(ofSize: 11, weight: .medium)
-        progressLabel.textColor = .white
+        titleLabel.alignment = .center
+        progressLabel.font = NSFont.systemFont(ofSize: 12, weight: .medium)
+        progressLabel.textColor = .lightGray
         progressLabel.alignment = .center
 
-        startButton.bezelStyle = .rounded
-        startButton.action = #selector(startClicked)
         noButton.bezelStyle = .rounded
         noButton.action = #selector(noClicked)
         yesButton.bezelStyle = .rounded
         yesButton.action = #selector(yesClicked)
+        yesButton.isHidden = true
 
         buttonStack.orientation = .horizontal
         buttonStack.spacing = 12
+        buttonStack.addView(noButton, in: .trailing)
 
-        let stack = NSStackView(views: [imageView, titleLabel, captionLabel, progressLabel, buttonStack])
+        let stack = NSStackView(views: [imageView, titleLabel, progressLabel, buttonStack])
         stack.orientation = .vertical
         stack.alignment = .centerX
         stack.spacing = 10
@@ -74,37 +62,21 @@ final class OverlayViewController: NSViewController {
         view = effectView
     }
 
-    /// Present a whole profile. `completion(true)` = user confirmed done,
+    /// Present a sequence. `completion(true)` = user confirmed done,
     /// `completion(false)` = dismissed without confirmation.
-    func present(profileName: String,
-                 exercises: [LibraryExercise],
-                 directory: URL,
-                 startMode: StartMode,
+    func present(header: String,
+                 items: [OverlayItem],
                  autoDelaySeconds: Int,
                  completion: @escaping (Bool) -> Void) {
-        self.profileName = profileName
-        self.remainingExercises = exercises
-        self.startMode = startMode
-        self.countdownSeconds = max(0, min(60, autoDelaySeconds))
-        self.onCompletion = completion
-        gifDirectory = directory
+        headerText = header
+        remainingItems = items
+        onCompletion = completion
+        countdownSeconds = max(0, min(60, autoDelaySeconds))
 
-        titleLabel.stringValue = profileName
-        captionLabel.stringValue = ""
+        titleLabel.stringValue = header
         progressLabel.stringValue = ""
-        buttonStack.views.forEach { buttonStack.removeView($0) }
         yesButton.isHidden = true
-        startButton.isHidden = true
-
-        noButton.isHidden = false
-        buttonStack.addView(noButton, in: .trailing)
-        switch startMode {
-        case .auto:
-            startCountdown()
-        case .click:
-            startButton.isHidden = false
-            buttonStack.addView(startButton, in: .leading)
-        }
+        startCountdown()
     }
 
     private func startCountdown() {
@@ -126,11 +98,6 @@ final class OverlayViewController: NSViewController {
         }
     }
 
-    @objc private func startClicked() {
-        countdownTimer?.invalidate()
-        beginSequence()
-    }
-
     @objc private func noClicked() {
         stop()
         onCompletion?(false)
@@ -142,73 +109,41 @@ final class OverlayViewController: NSViewController {
     }
 
     private func beginSequence() {
-        buttonStack.views.forEach { buttonStack.removeView($0) }
-        noButton.isHidden = false
-        buttonStack.addView(noButton, in: .trailing)
-        playNextExercise()
+        playNext()
     }
 
-    private func playNextExercise() {
-        guard !remainingExercises.isEmpty else {
+    private func playNext() {
+        guard !remainingItems.isEmpty else {
             showAllDone()
             return
         }
-        let exercise = remainingExercises.removeFirst()
-        titleLabel.stringValue = exercise.title
-        captionLabel.stringValue = exercise.caption
-
-        let volume = exercise.reps != nil ? "\(exercise.reps!)x" : "\(exercise.durationSeconds ?? 0) s"
-        progressLabel.stringValue = volume
-
-        gifQueue = exercise.gifs.map { gifDirectory.appendingPathComponent($0) }
-        if gifQueue.isEmpty {
-            imageView.image = NSImage(systemSymbolName: "figure.flexibility",
-                                      accessibilityDescription: nil)
+        let item = remainingItems.removeFirst()
+        titleLabel.stringValue = item.title
+        if let reps = item.reps {
+            progressLabel.stringValue = "\(reps)x"
         } else {
-            playNextGif()
+            progressLabel.stringValue = "\(item.seconds ?? 0) s"
         }
 
-        let seconds = TimeInterval(exercise.durationSeconds ?? 0)
-        if exercise.reps == nil && seconds > 0 {
-            playbackTimer = Timer.scheduledTimer(withTimeInterval: seconds, repeats: false) { [weak self] _ in
-                self?.playNextExercise()
-            }
+        // Duration: seconds if given, otherwise estimate ~1.5 s per rep.
+        let duration: TimeInterval
+        if let seconds = item.seconds, seconds > 0 {
+            duration = TimeInterval(seconds)
         } else {
-            let fallbackSeconds = 10.0
-            playbackTimer = Timer.scheduledTimer(withTimeInterval: fallbackSeconds, repeats: false) { [weak self] _ in
-                self?.playNextExercise()
-            }
+            duration = TimeInterval(max(1, item.reps ?? 10)) * 1.5
         }
-    }
-
-    private func playNextGif() {
-        playbackTimer?.invalidate()
-        animator?.stop()
-        animator = nil
-        guard !gifQueue.isEmpty else { return }
-        let url = gifQueue.removeFirst()
-        if let nextAnimator = GifAnimator(url: url) {
-            animator = nextAnimator
-            nextAnimator.start(in: imageView)
-        } else {
-            imageView.image = NSImage(systemSymbolName: "figure.flexibility",
-                                      accessibilityDescription: nil)
-        }
-        playbackTimer = Timer.scheduledTimer(withTimeInterval: 6, repeats: false) { [weak self] _ in
-            self?.playNextGif()
+        playbackTimer = Timer.scheduledTimer(withTimeInterval: duration, repeats: false) { [weak self] _ in
+            self?.playNext()
         }
     }
 
     private func showAllDone() {
-        animator?.stop()
         imageView.image = NSImage(systemSymbolName: "checkmark.circle",
                                    accessibilityDescription: nil)
-        titleLabel.stringValue = profileName
-        captionLabel.stringValue = "All done?"
+        titleLabel.stringValue = headerText
         progressLabel.stringValue = ""
         buttonStack.views.forEach { buttonStack.removeView($0) }
         yesButton.isHidden = false
-        noButton.isHidden = false
         buttonStack.addView(yesButton, in: .leading)
         buttonStack.addView(noButton, in: .trailing)
     }
@@ -218,7 +153,5 @@ final class OverlayViewController: NSViewController {
         countdownTimer = nil
         playbackTimer?.invalidate()
         playbackTimer = nil
-        animator?.stop()
-        animator = nil
     }
 }
