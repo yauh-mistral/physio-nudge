@@ -1,0 +1,20 @@
+{
+  "perGifSeconds": 6,
+  "exercises": [
+    {
+      "title": "Nacken-Dehnung",
+      "caption": "Kopf langsam zum Ohr neigen, Schulter bleibt unten. 15 Sekunden pro Seite.",
+      "gifs": ["neck-tilt-left.gif", "neck-tilt-right.gif"]
+    },
+    {
+      "title": "Schulterkreisen",
+      "caption": "Schultern langsam nach hinten kreisen, 10 Wiederholungen.",
+      "gifs": ["shoulder-rolls.gif"]
+    },
+    {
+      "title": "Brustdehnung",
+      "caption": "Hände hinter dem Kopf verschränken, Ellbogen nach hinten öffnen, 20 Sekunden halten.",
+      "gifs": ["chest-stretch.gif"]
+    }
+  ]
+}
