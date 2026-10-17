@@ -1,27 +1,38 @@
 # physio-nudge
 
-Nudges the user in customizable intervals to perform some physio exercises on macOS —
-via a small, non-intrusive corner overlay that plays a sequence of 1–3 exercise GIFs.
+Nudges the user — on cron-like, user-defined schedules — to perform
+movement exercises on macOS, via a small, non-intrusive corner overlay
+that plays a user-composed **profile** of exercises.
 
-**Das Wichtigste zuerst:** die vollständigen Anforderungen liegen im
-[requirements/](requirements/)-Ordner — Vision, Overlay-UX-Spec,
-GIF-/Content-Vorgaben, Architektur- und MVP-Akzeptanzkriterien.
+**The essentials first:** the complete requirements live in the
+[requirements/](requirements/) folder — vision, overlay UX spec,
+content/visual guidelines, architecture, and MVP acceptance criteria
+(all in English).
 
-## Kurzfassung
+## In Short
 
-- Menüleisten-App (kein Dock-Icon), zeigt im Intervall (Default 60 min) ein
-  300×300-Overlay in wählbarer Bildschirmecke
-- **Non-activating:** stiehlt keinem Fenster den Fokus; sichtbar auf allen
-  Desktops und über Fullscreen-Apps
-- Spielt 1–3 GIFs pro Übung + Titel + Anleitung, blendet sich selbst aus
-- Übungen: exercises.json + GIFs (Nutzerordner oder App-Bundle)
-- 100 % lokal: kein Netzwerk, keine Telemetrie
+- Menu-bar app (no Dock icon); cron-like nudges: "every 60 min",
+  "hourly 08:00–16:00", "at 10:00, 14:00, 18:00"
+- **Non-activating:** steals focus from no window; present on all
+  desktops and above full-screen apps; never appears during screen
+  sharing (setting-gated)
+- Plays a profile (1..n exercises) with title, instruction, and a simple
+  visual (animated GIF or start/end images) per exercise
+- Start modes: **auto perform** (configurable 0–60 s delay) or
+  **start by click**; "No" dismisses; "All done?" confirms completion
+- **Library** (exercises + profiles), **Nudges** (schedules), and
+  **Statistics** (completed exercises only) — configurable via UI or
+  plain JSON files
+- 100 % local: no network, no telemetry; clean one-folder uninstall
 
 ## Status
 
-Requirements: vollständig (siehe requirements/). Implementierung: MVP in Arbeit —
-Swift/AppKit-Code in Sources/, Build via Scripts/make-app.sh.
+Requirements: complete, reworked with the key user (see requirements/).
+Implementation: the initial single-interval MVP exists in Sources/;
+the profile/nudge-scheduler rework (M1–M3, see
+[requirements/09](requirements/09-mvp-and-acceptance-criteria.md)) is
+the next step.
 
-## Lizenz
+## License
 
-MIT (siehe LICENSE).
+MIT (see LICENSE).

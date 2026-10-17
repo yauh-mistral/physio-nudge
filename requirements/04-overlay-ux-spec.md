@@ -1,74 +1,75 @@
-# 04 — Overlay-UX-Spec (Das Herzstück)
+# 04 — Overlay UX Spec (The Core)
 
-## Grundprinzip
+## Base Principle
 
-Das Overlay ist ein **non-activating Corner-Overlay**: Es erscheint, ohne dass
-irgendein Fenster den Fokus verliert, bleibt über allen Desktops und sogar
-über Fullscreen-Apps sichtbar, und verschwindet nach der Übung von selbst.
+The overlay is a **non-activating corner overlay**: it appears without
+any window losing focus, is present on all Spaces and above the user's
+own full-screen content, and disappears by itself. Its goal is
+**presence, not foreground activity**: it behaves like a notification,
+never a dialog.
 
-## Visuelle Spezifikation
+## Visual Specification
 
-| Eigenschaft | Wert |
-|-------------|------|
-| Größe | 300 × 300 pt |
-| Position | wählbare Ecke, 24 pt Abstand zu sichtbarem Screenbereich (Dock beachten) |
-| Hintergrund | NSVisualEffectView, Material hudWindow, abgerundet (Radius 16) |
-| Titel | Systemfont 14 pt semibold, weiß |
-| Anleitungstext | Systemfont 12 pt, hellgrau, zentriert, max. Breite 260 pt |
-| GIF-Bereich | proportional skaliert, oben im Stack |
-| Schatten | aktiviert (deckt Overlay vom Inhalt ab) |
+| Property | Value |
+|----------|-------|
+| Size | 300 × 300 pt |
+| Position | selectable corner, 24 pt from visible screen area (mind the Dock) |
+| Background | NSVisualEffectView, hudWindow material, rounded (radius 16) |
+| Title | system font 14 pt semibold, white |
+| Instruction | system font 12 pt, light gray, centered, max width 260 pt |
+| Visual area | proportionally scaled, top of the stack |
+| Shadow | enabled (separates overlay from content) |
 
-Skizze:
+## Sequence Behavior
 
-```
-┌─────────────────────────┐
-│                         │
-│      [GIF-Animation]    │
-│                         │
-│      Nacken-Dehnung      │
-│  Kopf langsam zum Ohr   │
-│   neigen, 15 Sek. je    │
-│         Seite.          │
-└─────────────────────────┘
-```
+| Phase | Behavior |
+|-------|----------|
+| Appear | fade-in 350 ms (alphaValue 0 → 1), no activation |
+| Exercise phase | visual (GIF loop or start/end cross-fade) + title + instruction + progress ("2 / 3", "10x", "60 s") |
+| Between exercises | hard switch; next exercise starts immediately |
+| Confirm | "All done?" with Yes/No at sequence end |
+| Disappear | fade-out 300 ms, then the panel is removed entirely |
 
-## Zeitverhalten
+## Start Modes and Interaction
 
-| Phase | Verhalten |
-|-------|-----------|
-| Einblenden | Fade-in über 350 ms (alphaValue 0 → 1), ohne Aktivierung |
-| Pro GIF | Default 6 s (konfigurierbar: perGifSeconds) |
-| Zwischen GIFs | harter Wechsel, GIF läuft als Loop während seiner Zeit |
-| Ausblenden | Fade-out über 300 ms, Panel wird danach ganz entfernt |
+- **Auto perform**: a countdown (0–60 s, configured per nudge) runs in
+  the overlay; the sequence starts when it reaches zero.
+- **Start by click**: a Start button in the overlay; nothing runs before
+  the click.
+- **No button**: always visible; closes the overlay immediately
+  ("I'm not doing this now"). No snooze, no re-prompt.
+- **All done?**: after the last exercise the overlay asks Yes/No.
+  Yes logs the completed exercises; No logs nothing. Both close the
+  overlay.
 
-## Interaktion
+The overlay never becomes key or main: keyboard/click focus of the
+running app remains untouched (core acceptance criterion). It must never
+appear during video calls or while the user is screen-sharing (when the
+suppression setting is enabled) — presence is acceptable, appearing in a
+customer's meeting is not.
 
-- **MVP:** keine Interaktion — das Overlay ist klick-transparent zu betrachten,
-  schließt automatisch. (Kein „Weiter"-Button, kein Draggen.)
-- **FR-13 (Should):** Klick auf das Overlay schließt es vorzeitig.
-- Das Overlay wird **nie** key oder main: Tastatur/Klick-Fokus der laufenden
-  App bleibt unangetastet (Kern-Akzeptanzkriterium).
+## Visibility Rules
 
-## Sichtbarkeitsregeln
+1. Visible on **all Spaces** (canJoinAllSpaces).
+2. Also **above full-screen apps** (fullScreenAuxiliary) — e.g. video in
+   full screen: the nudge remains visible.
+3. **Not shown** when: app paused, screen locked, screensaver active, or
+   (setting enabled) screen capture/share is active.
+4. Never two overlays at the same time; simultaneous nudges queue and
+   run sequentially in alphabetical profile order (FR-03).
 
-1. Auf **allen Spaces** sichtbar (canJoinAllSpaces).
-2. Auch **über Fullscreen-Apps** (fullScreenAuxiliary) — z. B. Video im
-   Vollbild: der Nudge bleibt sichtbar.
-3. **Nicht anzeigen**, wenn: App pausiert (FR-05), Bildschirm gesperrt,
-   Screensaver aktiv, oder (Should, FR-14) Meeting/Screen-Share läuft.
-4. Nie zwei Overlays gleichzeitig (Guard im Controller).
+## No-Disturb Philosophy
 
-## Nicht-Stören-Philosophie
+- No sound in MVP (deliberately "no audio").
+- No bounce, no notification center, no badge — the overlay itself is
+  the notification.
+- The only "intrusiveness" is the presence in a screen corner for the
+  duration of the exercise.
 
-- Kein Sound (Konfiguration ausdrücklich „ohne Audio" im MVP).
-- Kein Bounce, keine Benachrichtigungszentrale, kein Badge.
-- Die einzige „Aufdringlichkeit" ist die Anwesenheit in der Bildschirmecke
-  für wenige Sekunden.
+## Accessibility
 
-## Barrierefreiheit
-
-- Text-Kontrast auf hudWindow-Material ≥ 4,5:1 (Prüfung mit Accessibility
+- Text contrast on hudWindow material ≥ 4.5:1 (check with Accessibility
   Inspector).
-- Alle Texte über lokalisierte Strings (de/en ab MVP: de).
-- Keine reinen GIF-Informationen: jede Übung hat zwingend Titel + Text
-  (Fallback, falls Animation nicht geladen werden kann).
+- All texts via localized string catalogs (English at MVP).
+- Every exercise has title + text; the visual is always an addition,
+  never the sole information carrier.
