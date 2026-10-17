@@ -80,10 +80,10 @@ final class LibraryWindowController: NSWindowController {
     }
 
     private func titledBox(title: String, view: NSView) -> NSView {
-        let box = NSBox(title: title)
+        let box = NSBox()
+        box.title = title
         box.titleFont = NSFont.systemFont(ofSize: 12, weight: .semibold)
         box.contentView = view
-        box.boxType = .secondary
         return box
     }
 
