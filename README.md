@@ -25,6 +25,27 @@ content/visual guidelines, architecture, and MVP acceptance criteria
   plain JSON files
 - 100 % local: no network, no telemetry; clean one-folder uninstall
 
+## Build & Run It Yourself
+
+The app is not yet distributed as a binary — build it locally on your
+Mac (macOS 13+, Xcode or its command line tools):
+
+```bash
+git clone https://github.com/yauh-mistral/physio-nudge.git
+cd physio-nudge
+bash Scripts/make-app.sh
+```
+
+That single command builds, bundles, and launches `PhysioNudge.app`
+(the menu-bar icon appears — the app intentionally has no Dock icon).
+You can also build and run it from Xcode like any SwiftPM project.
+
+**Full guide — including Xcode steps, local "installation" to
+/Applications, the Gatekeeper note for unsigned apps, updating, and
+uninstalling: [docs/build.md](docs/build.md)**
+
+Prebuilt binaries will appear on the Releases page later.
+
 ## Status
 
 Requirements: complete, reworked with the key user (see requirements/).
