@@ -4,27 +4,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var overlayPanel: OverlayPanel?
     private var overlayController: OverlayViewController?
-    private var breakTimer: Timer?
 
-    private let catalog = ExerciseCatalog()
-    private var isPaused = false
-    private var intervalMinutes = 60
-    private var corner = OverlayCorner.bottomRight
+    private let schedulerService = SchedulerService()
+    private var libraryWindow: LibraryWindowController?
+    private var nudgeWindow: NudgeWindowController?
+    private var settingsWindow: SettingsWindowController?
 
-    private var pauseMenuItem: NSMenuItem?
     private let overlaySize = NSSize(width: 300, height: 300)
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupStatusItem()
-        scheduleNextBreak()
 
-        // NFR-10: recalibrate the timer after waking from sleep.
-        NSWorkspace.shared.notificationCenter.addObserver(
-            self,
-            selector: #selector(sessionDidWake),
-            name: NSWorkspace.didWakeNotification,
-            object: nil
-        )
+        schedulerService.onPresent = { [weak self] profile, exercises in
+            self?.present(profileName: profile.name, exercises: exercises)
+        }
+        schedulerService.start()
     }
 
     // MARK: - Menu bar icon & menu
@@ -38,56 +32,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let menu = NSMenu()
-        // Never let AppKit auto-disable our items: every action has an
-        // explicit target, and auto-validation could grey them out.
         menu.autoenablesItems = false
 
-        let pauseItem = NSMenuItem(title: "Pause", action: #selector(togglePaused), keyEquivalent: "p")
-        pauseItem.target = self
-        pauseItem.isEnabled = true
-        menu.addItem(pauseItem)
-        pauseMenuItem = pauseItem
+        let libraryItem = NSMenuItem(title: "Open Library",
+                                     action: #selector(openLibrary), keyEquivalent: "l")
+        libraryItem.target = self
+        libraryItem.isEnabled = true
+        menu.addItem(libraryItem)
 
-        let nowItem = NSMenuItem(title: "Exercise now", action: #selector(showOverlayNow), keyEquivalent: "n")
-        nowItem.target = self
-        nowItem.isEnabled = true
-        menu.addItem(nowItem)
+        let nudgesItem = NSMenuItem(title: "Configure Nudges",
+                                    action: #selector(openNudges), keyEquivalent: "n")
+        nudgesItem.target = self
+        nudgesItem.isEnabled = true
+        menu.addItem(nudgesItem)
 
-        menu.addItem(.separator())
-
-        // FR-07: interval submenu
-        let intervalMenu = NSMenu()
-        intervalMenu.autoenablesItems = false
-        for minutes in [15, 30, 45, 60, 90] {
-            let entry = NSMenuItem(title: "Every \(minutes) minutes",
-                                   action: #selector(setInterval(_:)), keyEquivalent: "")
-            entry.target = self
-            entry.tag = minutes
-            entry.isEnabled = true
-            entry.state = minutes == intervalMinutes ? .on : .off
-            intervalMenu.addItem(entry)
-        }
-        let intervalMenuItem = NSMenuItem(title: "Interval", action: nil, keyEquivalent: "")
-        intervalMenuItem.isEnabled = true
-        intervalMenuItem.submenu = intervalMenu
-        menu.addItem(intervalMenuItem)
-
-        // FR-08: corner submenu
-        let cornerMenu = NSMenu()
-        cornerMenu.autoenablesItems = false
-        for (index, candidate) in OverlayCorner.allCases.enumerated() {
-            let entry = NSMenuItem(title: candidate.rawValue,
-                                   action: #selector(setCorner(_:)), keyEquivalent: "")
-            entry.target = self
-            entry.tag = index
-            entry.isEnabled = true
-            entry.state = candidate == corner ? .on : .off
-            cornerMenu.addItem(entry)
-        }
-        let cornerMenuItem = NSMenuItem(title: "Position", action: nil, keyEquivalent: "")
-        cornerMenuItem.isEnabled = true
-        cornerMenuItem.submenu = cornerMenu
-        menu.addItem(cornerMenuItem)
+        let settingsItem = NSMenuItem(title: "Settings",
+                                      action: #selector(openSettings), keyEquivalent: ",")
+        settingsItem.target = self
+        settingsItem.isEnabled = true
+        menu.addItem(settingsItem)
 
         menu.addItem(.separator())
 
@@ -102,90 +65,95 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = item
     }
 
-    // MARK: - Timer
+    // MARK: - Windows
 
-    private func scheduleNextBreak() {
-        breakTimer?.invalidate()
-        guard !isPaused else { return }
-        // .common mode: the timer must also fire while a menu is open
-        // or during window resizing drags.
-        breakTimer = Timer.scheduledTimer(
-            withTimeInterval: TimeInterval(intervalMinutes * 60),
-            repeats: false
-        ) { [weak self] _ in
-            self?.showOverlay()
+    @objc private func openLibrary() {
+        if libraryWindow == nil {
+            let controller = LibraryWindowController()
+            controller.onDoNow = { [weak self] exercise in
+                self?.present(exercise: exercise)
+            }
+            libraryWindow = controller
         }
-        if let timer = breakTimer {
-            RunLoop.main.add(timer, forMode: .common)
+        libraryWindow?.reload()
+        libraryWindow?.showWindow(self)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    @objc private func openNudges() {
+        if nudgeWindow == nil {
+            nudgeWindow = NudgeWindowController()
         }
+        nudgeWindow?.reload()
+        nudgeWindow?.showWindow(self)
+        NSApp.activate(ignoringOtherApps: true)
     }
 
-    @objc private func sessionDidWake() {
-        scheduleNextBreak()
+    @objc private func openSettings() {
+        if settingsWindow == nil {
+            settingsWindow = SettingsWindowController()
+        }
+        settingsWindow?.showWindow(self)
+        NSApp.activate(ignoringOtherApps: true)
     }
 
-    // MARK: - Menu actions
+    // MARK: - Callbacks from windows
 
-    @objc private func togglePaused() {
-        isPaused.toggle()
-        pauseMenuItem?.title = isPaused ? "Resume" : "Pause"
-        scheduleNextBreak()
+    func schedulerDidReschedule() {
+        schedulerService.reschedule()
     }
 
-    @objc private func showOverlayNow() {
-        showOverlay()
-    }
+    // MARK: - Overlay presentation
 
-    @objc private func setInterval(_ sender: NSMenuItem) {
-        intervalMinutes = sender.tag
-        sender.menu?.items.forEach { $0.state = $0.tag == sender.tag ? .on : .off }
-        scheduleNextBreak()
-    }
-
-    @objc private func setCorner(_ sender: NSMenuItem) {
-        let all = OverlayCorner.allCases
-        guard all.indices.contains(sender.tag) else { return }
-        corner = all[sender.tag]
-        sender.menu?.items.forEach { $0.state = $0.tag == sender.tag ? .on : .off }
-    }
-
-    // MARK: - Overlay (FR-02 to FR-04, NFR-11)
-
-    private func showOverlay() {
-        scheduleNextBreak()
-        guard overlayPanel == nil else { return }
-
+    private func present(profileName: String, exercises: [LibraryExercise]) {
+        guard overlayPanel == nil else {
+            // Another presentation is active; the queue drains on finish.
+            return
+        }
+        let corner = DataStore.shared.currentCorner
         let panel = OverlayPanel(size: overlaySize, corner: corner)
         let controller = OverlayViewController()
         panel.contentViewController = controller
+        panel.present(at: corner)
 
         overlayPanel = panel
         overlayController = controller
 
-        let finish = { [weak self, weak panel, weak controller] in
-            controller?.stop()
-            panel?.dismiss {
-                self?.overlayPanel = nil
-                self?.overlayController = nil
-            }
+        controller.present(profileName: profileName,
+                           exercises: exercises,
+                           directory: DataStore.shared.directory,
+                           startMode: .auto,
+                           autoDelaySeconds: 10) { [weak self] _ in
+            self?.dismissOverlay()
+            self?.schedulerService.overlayDidFinish()
         }
+    }
 
-        if let exercise = catalog.randomExercise() {
-            controller.play(exercise: exercise,
-                            directory: catalog.exerciseDirectory,
-                            perGifSeconds: catalog.catalog.perGifSeconds ?? 6,
-                            onFinish: finish)
-        } else {
-            // FR-11: fallback if no usable visuals exist.
-            controller.play(exercise: Exercise(
-                                title: "Time for a break!",
-                                caption: "No exercise visuals found. Place GIF files and exercises.json in the Exercises folder — see requirements/05-exercise-content-and-visuals.md.",
-                                gifs: []),
-                            directory: catalog.exerciseDirectory,
-                            perGifSeconds: 8,
-                            onFinish: finish)
+    private func present(exercise: LibraryExercise) {
+        guard overlayPanel == nil else { return }
+        let corner = DataStore.shared.currentCorner
+        let panel = OverlayPanel(size: overlaySize, corner: corner)
+        let controller = OverlayViewController()
+        panel.contentViewController = controller
+        panel.present(at: corner)
+
+        overlayPanel = panel
+        overlayController = controller
+
+        controller.present(profileName: exercise.title,
+                           exercises: [exercise],
+                           directory: DataStore.shared.directory,
+                           startMode: .auto,
+                           autoDelaySeconds: 5) { [weak self] _ in
+            self?.dismissOverlay()
         }
+    }
 
-        panel.present()
+    private func dismissOverlay() {
+        overlayController?.stop()
+        let panel = overlayPanel
+        overlayController = nil
+        overlayPanel = nil
+        panel?.dismiss()
     }
 }
