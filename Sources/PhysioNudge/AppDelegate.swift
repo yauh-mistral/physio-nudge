@@ -17,16 +17,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         setupStatusItem()
         scheduleNextBreak()
 
-        // NFR-10: Timer nach dem Aufwachen aus dem Sleep neu kalibrieren.
+        // NFR-10: recalibrate the timer after waking from sleep.
         NSWorkspace.shared.notificationCenter.addObserver(
             self,
             selector: #selector(sessionDidWake),
-            name: NSWorkspace.sessionDidWakeNotification,
+            name: NSWorkspace.didWakeNotification,
             object: nil
         )
     }
 
-    // MARK: - Menüleisten-Icon & Menü
+    // MARK: - Menu bar icon & menu
 
     private func setupStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -48,7 +48,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         menu.addItem(.separator())
 
-        // FR-07: Intervall-Untermenü
+        // FR-07: interval submenu
         let intervalMenu = NSMenu()
         for minutes in [15, 30, 45, 60, 90] {
             let entry = NSMenuItem(title: "Alle \(minutes) Minuten",
@@ -62,7 +62,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         intervalMenuItem.submenu = intervalMenu
         menu.addItem(intervalMenuItem)
 
-        // FR-08: Ecken-Untermenü
+        // FR-08: corner submenu
         let cornerMenu = NSMenu()
         for (index, candidate) in OverlayCorner.allCases.enumerated() {
             let entry = NSMenuItem(title: candidate.rawValue,
@@ -102,7 +102,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         scheduleNextBreak()
     }
 
-    // MARK: - Menü-Aktionen
+    // MARK: - Menu actions
 
     @objc private func togglePaused() {
         isPaused.toggle()
@@ -129,7 +129,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         sender.menu?.items.forEach { $0.state = $0.tag == sender.tag ? .on : .off }
     }
 
-    // MARK: - Overlay (FR-02 bis FR-04, NFR-11)
+    // MARK: - Overlay (FR-02 to FR-04, NFR-11)
 
     private func showOverlay() {
         scheduleNextBreak()
@@ -156,7 +156,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                             perGifSeconds: catalog.catalog.perGifSeconds ?? 6,
                             onFinish: finish)
         } else {
-            // FR-11: Fallback, falls keine verwertbaren GIFs vorliegen.
+            // FR-11: fallback if no usable visuals exist.
             controller.play(exercise: Exercise(
                                 title: "Zeit für eine Pause!",
                                 caption: "Keine GIFs gefunden. Lege GIF-Dateien und exercises.json in den Exercises-Ordner - Details in requirements/05-uebungs-inhalte.md.",
