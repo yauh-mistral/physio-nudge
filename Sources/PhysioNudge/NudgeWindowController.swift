@@ -63,10 +63,10 @@ final class NudgeWindowController: NSWindowController {
         listStack.addArrangedSubview(scroll)
         listStack.addArrangedSubview(listButtons)
 
-        let listBox = NSBox(title: "Nudges")
+        let listBox = NSBox()
+        listBox.title = "Nudges"
         listBox.titleFont = NSFont.systemFont(ofSize: 12, weight: .semibold)
         listBox.contentView = listStack
-        listBox.boxType = .secondary
 
         nameField.placeholderString = "Hourly cervical"
         fromField.placeholderString = "08:00"
@@ -100,13 +100,13 @@ final class NudgeWindowController: NSWindowController {
         editorStack.addArrangedSubview(enabledCheck)
         editorStack.addArrangedSubview(applyButton)
 
-        let editorBox = NSBox(title: "Edit")
+        let editorBox = NSBox()
+        editorBox.title = "Edit"
         editorBox.titleFont = NSFont.systemFont(ofSize: 12, weight: .semibold)
         editorBox.contentView = editorStack
-        editorBox.boxType = .secondary
 
         let split = NSSplitView()
-        split.vertical = true
+        split.isVertical = true
         split.dividerStyle = .thin
         split.addArrangedSubview(listBox)
         split.addArrangedSubview(editorBox)
@@ -209,7 +209,11 @@ final class NudgeWindowController: NSWindowController {
             profilePopup.addItem(withTitle: profile.name)
             profilePopup.lastItem?.representedObject = profile.id
         }
-        profilePopup.selectItem(withRepresentedObject: nudge.profileId)
+        if let index = profilePopup.itemArray.firstIndex(where: {
+            ($0.representedObject as? String) == nudge.profileId
+        }) {
+            profilePopup.selectItem(at: index)
+        }
         enabledCheck.state = nudge.enabled ? .on : .off
         switch nudge.schedule.type {
         case "interval":
