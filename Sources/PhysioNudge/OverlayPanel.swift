@@ -41,8 +41,18 @@ final class OverlayPanel: NSPanel {
     private var corner: OverlayCorner = .bottomRight
     private var overlaySize: NSSize = NSSize(width: 300, height: 300)
 
+    /// The screen the overlay is anchored to. On multi-monitor setups,
+    /// NSScreen.main is whichever screen currently has focus — that made
+    /// the nudge jump between monitors. Anchor to the screen that owns
+    /// the menu bar (the primary one) instead.
+    static var anchorScreen: NSScreen? {
+        NSScreen.screens.first { $0.frame == NSScreen.screens.first?.frame }
+            ?? NSScreen.main
+            ?? NSScreen.screens.first
+    }
+
     convenience init(size: NSSize, corner: OverlayCorner) {
-        let screen = NSScreen.main ?? NSScreen.screens[0]
+        let screen = Self.anchorScreen ?? NSScreen.screens[0]
         let rect = NSRect(origin: corner.origin(for: size, in: screen), size: size)
         self.init(contentRect: rect,
                   styleMask: [.borderless, .nonactivatingPanel],
@@ -66,7 +76,7 @@ final class OverlayPanel: NSPanel {
     /// resizes from the bottom-left origin otherwise, so a bottom-anchored
     /// panel would float and a top-anchored one would grow off-screen).
     func reposition() {
-        guard let screen = NSScreen.main ?? NSScreen.screens.first else { return }
+        guard let screen = Self.anchorScreen ?? NSScreen.screens.first else { return }
         let origin = corner.origin(for: overlaySize, in: screen)
         let frame = NSRect(origin: origin, size: overlaySize)
         setFrame(frame, display: true)

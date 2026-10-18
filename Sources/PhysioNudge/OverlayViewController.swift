@@ -1,8 +1,9 @@
 import AppKit
 
 /// Presents a sequence of overlay items: title + amount, one after
-/// another, then the "All done?" confirmation. Auto start with countdown;
-/// "No" dismisses at any time.
+/// another, then the "All done?" confirmation.
+/// Buttons are explicit: "Start Now" (skip the countdown), "Skip"
+/// (dismiss without doing), and at the end "Done" / "Skipped".
 final class OverlayViewController: NSViewController {
     private let effectView = NSVisualEffectView()
     private let titleLabel = NSTextField(labelWithString: "")
@@ -10,8 +11,10 @@ final class OverlayViewController: NSViewController {
     private let progressLabel = NSTextField(labelWithString: "")
     private let visualView = ExerciseVisualView()
     private let imageView = NSImageView()
-    private let noButton = NSButton(title: "No", target: nil, action: nil)
-    private let yesButton = NSButton(title: "Yes", target: nil, action: nil)
+    private let startNowButton = NSButton(title: "Start Now", target: nil, action: nil)
+    private let skipButton = NSButton(title: "Skip", target: nil, action: nil)
+    private let doneButton = NSButton(title: "Done", target: nil, action: nil)
+    private let skippedButton = NSButton(title: "Skipped", target: nil, action: nil)
     private let buttonStack = NSStackView()
 
     private var playbackTimer: Timer?
@@ -40,15 +43,19 @@ final class OverlayViewController: NSViewController {
         progressLabel.textColor = .lightGray
         progressLabel.alignment = .center
 
-        noButton.bezelStyle = .rounded
-        noButton.action = #selector(noClicked)
-        yesButton.bezelStyle = .rounded
-        yesButton.action = #selector(yesClicked)
-        yesButton.isHidden = true
+        startNowButton.bezelStyle = .rounded
+        startNowButton.action = #selector(startNowClicked)
+        skipButton.bezelStyle = .rounded
+        skipButton.action = #selector(skipClicked)
+        doneButton.bezelStyle = .rounded
+        doneButton.action = #selector(doneClicked)
+        skippedButton.bezelStyle = .rounded
+        skippedButton.action = #selector(skipClicked)
+        doneButton.isHidden = true
+        skippedButton.isHidden = true
 
         buttonStack.orientation = .horizontal
         buttonStack.spacing = 12
-        buttonStack.addView(noButton, in: .trailing)
 
         descriptionLabel.font = NSFont.systemFont(ofSize: 11)
         descriptionLabel.textColor = .lightGray
@@ -83,7 +90,13 @@ final class OverlayViewController: NSViewController {
 
         titleLabel.stringValue = header
         progressLabel.stringValue = ""
-        yesButton.isHidden = true
+        doneButton.isHidden = true
+        skippedButton.isHidden = true
+
+        buttonStack.views.forEach { buttonStack.removeView($0) }
+        buttonStack.addView(startNowButton, in: .leading)
+        buttonStack.addView(skipButton, in: .trailing)
+
         startCountdown()
     }
 
@@ -106,17 +119,25 @@ final class OverlayViewController: NSViewController {
         }
     }
 
-    @objc private func noClicked() {
+    @objc private func startNowClicked() {
+        countdownTimer?.invalidate()
+        beginSequence()
+    }
+
+    @objc private func skipClicked() {
         stop()
         onCompletion?(false)
     }
 
-    @objc private func yesClicked() {
+    @objc private func doneClicked() {
         stop()
         onCompletion?(true)
     }
 
     private func beginSequence() {
+        buttonStack.views.forEach { buttonStack.removeView($0) }
+        buttonStack.addView(skipButton, in: .trailing)
+        skipButton.title = "Skip"
         playNext()
     }
 
@@ -163,11 +184,12 @@ final class OverlayViewController: NSViewController {
         visualView.configure(kind: .none)
         imageView.image = nil
         titleLabel.stringValue = headerText
-        progressLabel.stringValue = ""
+        progressLabel.stringValue = "All exercises finished."
         buttonStack.views.forEach { buttonStack.removeView($0) }
-        yesButton.isHidden = false
-        buttonStack.addView(yesButton, in: .leading)
-        buttonStack.addView(noButton, in: .trailing)
+        doneButton.isHidden = false
+        skippedButton.isHidden = false
+        buttonStack.addView(doneButton, in: .leading)
+        buttonStack.addView(skippedButton, in: .trailing)
     }
 
     func stop() {
