@@ -496,8 +496,11 @@ final class LibraryWindowController: NSWindowController, NSWindowDelegate {
         // Exercise detail
         let exercise = selectedExercise
         let hasExercise = exercise != nil
-        [detailTitleField, detailTypePopup, detailDescriptionView,
-         chooseImageButton, removeImageButton].forEach { $0.isEnabled = hasExercise }
+        detailTitleField.isEnabled = hasExercise
+        detailTypePopup.isEnabled = hasExercise
+        detailDescriptionView.isEditable = hasExercise
+        chooseImageButton.isEnabled = hasExercise
+        removeImageButton.isEnabled = hasExercise
         if let exercise = exercise {
             detailTitleField.stringValue = exercise.title
             detailTypePopup.selectItem(withTitle: (exercise.type ?? .mobility).displayName)
