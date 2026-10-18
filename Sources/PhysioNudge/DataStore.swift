@@ -3,6 +3,8 @@ import Foundation
 struct Exercise: Codable {
     var id: String
     var title: String
+    /// Schematic visual kind: "nod", "shake", "tilt", or nil for none.
+    var visual: String?
 }
 
 /// One step inside a profile: an exercise plus its amount (reps) or time.
@@ -133,6 +135,7 @@ struct AppSettings: Codable {
 /// One resolved playback item for the overlay: exercise title + amount.
 struct OverlayItem {
     let title: String
+    let visual: String?
     let reps: Int?
     let seconds: Int?
 }
@@ -191,9 +194,9 @@ final class DataStore {
     private static func seedLibrary() -> ExerciseLibrary {
         ExerciseLibrary(
             exercises: [
-                Exercise(id: "head-nod", title: "Head Nod"),
-                Exercise(id: "head-shake", title: "Head Shake"),
-                Exercise(id: "ear-to-shoulder", title: "Ear to Shoulder")
+                Exercise(id: "head-nod", title: "Head Nod", visual: "nod"),
+                Exercise(id: "head-shake", title: "Head Shake", visual: "shake"),
+                Exercise(id: "ear-to-shoulder", title: "Ear to Shoulder", visual: "tilt")
             ],
             profiles: [
                 Profile(id: "cervical-mobility", name: "Cervical Mobility", entries: [
