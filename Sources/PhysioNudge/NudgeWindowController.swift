@@ -1,9 +1,10 @@
 import AppKit
 
 /// Configure Nudges window: list of nudges (profile + schedule), create,
-/// edit, delete. Schedules: fixed times, regular interval (typed minutes,
-/// default 60). "New Profile…" jumps to the Library with a fresh profile
-/// editor open.
+/// edit, delete. Schedule: regular interval (typed minutes, default 60);
+/// every change saves automatically. "New Profile…" jumps to the Library
+/// with a fresh profile editor open; "Trigger Now" fires the nudge
+/// immediately for testing.
 final class NudgeWindowController: NSWindowController {
     private let tableView = NSTableView()
     private let addButton = NSButton(title: "+", target: nil, action: nil)
@@ -14,9 +15,8 @@ final class NudgeWindowController: NSWindowController {
     private let newProfileButton = NSButton(title: "New Profile…", target: nil, action: nil)
     private let typePopup = NSPopUpButton()
     private let minutesField = NSTextField()
-    private let timesField = NSTextField()
     private let enabledCheck = NSButton(checkboxWithTitle: "Enabled", target: nil, action: nil)
-    private let applyButton = NSButton(title: "Apply", target: nil, action: nil)
+    private let triggerNowButton = NSButton(title: "Trigger Now", target: nil, action: nil)
 
     private var selectedNudge: Nudge?
 
@@ -72,9 +72,12 @@ final class NudgeWindowController: NSWindowController {
         listBox.contentView = listStack
 
         nameField.placeholderString = "Hourly cervical"
+        nameField.target = self
+        nameField.action = #selector(fieldChanged)
+        minutesField.target = self
+        minutesField.action = #selector(fieldChanged)
         minutesField.placeholderString = "60"
-        timesField.placeholderString = "10:00, 14:00, 18:00"
-        typePopup.addItems(withTitles: ["Regular interval", "At fixed times"])
+        typePopup.addItems(withTitles: ["Regular interval"])
         typePopup.action = #selector(scheduleTypeChanged)
         typePopup.target = self
 
@@ -83,10 +86,14 @@ final class NudgeWindowController: NSWindowController {
         newProfileButton.target = self
 
         enabledCheck.setButtonType(.switch)
-        applyButton.bezelStyle = .rounded
-        applyButton.action = #selector(applyChanges)
-        applyButton.target = self
-        applyButton.isEnabled = false
+        enabledCheck.target = self
+        enabledCheck.action = #selector(fieldChanged)
+        profilePopup.target = self
+        profilePopup.action = #selector(fieldChanged)
+        triggerNowButton.bezelStyle = .rounded
+        triggerNowButton.action = #selector(triggerNowClicked)
+        triggerNowButton.target = self
+        triggerNowButton.isEnabled = false
 
         let editorGrid = NSGridView(views: [
             [NSTextField(labelWithString: "Name:"), nameField],
@@ -94,7 +101,6 @@ final class NudgeWindowController: NSWindowController {
             [NSTextField(labelWithString: ""), newProfileButton],
             [NSTextField(labelWithString: "Schedule:"), typePopup],
             [NSTextField(labelWithString: "Minutes between:"), minutesField],
-            [NSTextField(labelWithString: "Times (comma-separated):"), timesField],
         ])
         editorGrid.rowSpacing = 8
         editorGrid.columnSpacing = 8
@@ -104,7 +110,7 @@ final class NudgeWindowController: NSWindowController {
         editorStack.spacing = 10
         editorStack.addArrangedSubview(editorGrid)
         editorStack.addArrangedSubview(enabledCheck)
-        editorStack.addArrangedSubview(applyButton)
+        editorStack.addArrangedSubview(triggerNowButton)
 
         let editorBox = NSBox()
         editorBox.title = "Edit"
@@ -130,14 +136,7 @@ final class NudgeWindowController: NSWindowController {
     }
 
     private func showScheduleFields() {
-        switch typePopup.indexOfSelectedItem {
-        case 0:
-            minutesField.isHidden = false
-            timesField.isHidden = true
-        default:
-            minutesField.isHidden = true
-            timesField.isHidden = false
-        }
+        minutesField.isHidden = false
     }
 
     @objc private func scheduleTypeChanged() {
@@ -173,34 +172,28 @@ final class NudgeWindowController: NSWindowController {
         (NSApp.delegate as? AppDelegate)?.schedulerDidReschedule()
     }
 
-    @objc private func applyChanges() {
+    @objc private func fieldChanged() {
         guard var nudge = selectedNudge else { return }
         nudge.name = nameField.stringValue.isEmpty ? "Nudge" : nameField.stringValue
         nudge.profileId = profilePopup.selectedItem?.representedObject as? String ?? nudge.profileId
         nudge.enabled = enabledCheck.state == .on
-        switch typePopup.indexOfSelectedItem {
-        case 0:
-            let minutes = Int(minutesField.stringValue.trimmingCharacters(in: .whitespaces)) ?? 60
-            nudge.schedule = Schedule(type: "interval", intervalMinutes: max(1, minutes),
-                                      fromTime: nil, toTime: nil, times: nil)
-        default:
-            let times = timesField.stringValue
-                .split(separator: ",")
-                .map { $0.trimmingCharacters(in: .whitespaces) }
-                .filter { !$0.isEmpty }
-            nudge.schedule = Schedule(type: "at", intervalMinutes: nil,
-                                     fromTime: nil, toTime: nil, times: times)
-        }
+        let minutes = Int(minutesField.stringValue.trimmingCharacters(in: .whitespaces)) ?? 60
+        nudge.schedule = Schedule(type: "interval", intervalMinutes: max(1, minutes),
+                                  fromTime: nil, toTime: nil, times: nil)
         DataStore.shared.update(nudges: DataStore.shared.nudges.map { $0.id == nudge.id ? nudge : $0 })
         selectedNudge = nudge
-        reload()
+        tableView.reloadData()
         (NSApp.delegate as? AppDelegate)?.schedulerDidReschedule()
+    }
+
+    @objc private func triggerNowClicked() {
+        (NSApp.delegate as? AppDelegate)?.triggerNudgeNow()
     }
 
     private func clearEditor() {
         nameField.stringValue = ""
         enabledCheck.state = .off
-        applyButton.isEnabled = false
+        triggerNowButton.isEnabled = false
         deleteButton.isEnabled = false
     }
 
@@ -217,25 +210,17 @@ final class NudgeWindowController: NSWindowController {
             profilePopup.selectItem(at: index)
         }
         enabledCheck.state = nudge.enabled ? .on : .off
-        switch nudge.schedule.type {
-        case "interval":
-            typePopup.selectItem(at: 0)
-            minutesField.stringValue = "\(nudge.schedule.intervalMinutes ?? 60)"
-        case "at":
-            typePopup.selectItem(at: 1)
-            timesField.stringValue = (nudge.schedule.times ?? []).joined(separator: ", ")
-        default:
-            typePopup.selectItem(at: 0)
-            minutesField.stringValue = "60"
-        }
+        typePopup.selectItem(at: 0)
+        minutesField.stringValue = "\(nudge.schedule.intervalMinutes ?? 60)"
         showScheduleFields()
-        applyButton.isEnabled = true
+        triggerNowButton.isEnabled = true
         deleteButton.isEnabled = true
     }
 
     func reload() {
         tableView.reloadData()
         deleteButton.isEnabled = selectedNudge != nil
+        triggerNowButton.isEnabled = selectedNudge != nil
     }
 }
 
@@ -259,7 +244,7 @@ extension NudgeWindowController: NSTableViewDataSource, NSTableViewDelegate {
         guard row >= 0, row < DataStore.shared.nudges.count else {
             selectedNudge = nil
             deleteButton.isEnabled = false
-            applyButton.isEnabled = false
+            triggerNowButton.isEnabled = false
             return
         }
         let nudge = DataStore.shared.nudges[row]
