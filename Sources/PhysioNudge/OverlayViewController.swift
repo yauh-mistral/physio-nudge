@@ -7,7 +7,7 @@ final class OverlayViewController: NSViewController {
     private let effectView = NSVisualEffectView()
     private let titleLabel = NSTextField(labelWithString: "")
     private let progressLabel = NSTextField(labelWithString: "")
-    private let imageView = NSImageView()
+    private let visualView = ExerciseVisualView()
     private let noButton = NSButton(title: "No", target: nil, action: nil)
     private let yesButton = NSButton(title: "Yes", target: nil, action: nil)
     private let buttonStack = NSStackView()
@@ -27,9 +27,8 @@ final class OverlayViewController: NSViewController {
         effectView.wantsLayer = true
         effectView.layer?.cornerRadius = 16
 
-        imageView.imageScaling = .scaleProportionallyUpOrDown
-        imageView.image = NSImage(systemSymbolName: "figure.flexibility",
-                                  accessibilityDescription: nil)
+        visualView.configure(kind: .none)
+
         titleLabel.font = NSFont.systemFont(ofSize: 15, weight: .semibold)
         titleLabel.textColor = .white
         titleLabel.alignment = .center
@@ -47,7 +46,7 @@ final class OverlayViewController: NSViewController {
         buttonStack.spacing = 12
         buttonStack.addView(noButton, in: .trailing)
 
-        let stack = NSStackView(views: [imageView, titleLabel, progressLabel, buttonStack])
+        let stack = NSStackView(views: [visualView, titleLabel, progressLabel, buttonStack])
         stack.orientation = .vertical
         stack.alignment = .centerX
         stack.spacing = 10
@@ -119,6 +118,8 @@ final class OverlayViewController: NSViewController {
         }
         let item = remainingItems.removeFirst()
         titleLabel.stringValue = item.title
+        visualView.configure(kind: ExerciseVisualView.Kind(rawValue: item.visual ?? "none") ?? .none)
+        visualView.startAnimating()
         if let reps = item.reps {
             progressLabel.stringValue = "\(reps)x"
         } else {
@@ -138,8 +139,8 @@ final class OverlayViewController: NSViewController {
     }
 
     private func showAllDone() {
-        imageView.image = NSImage(systemSymbolName: "checkmark.circle",
-                                   accessibilityDescription: nil)
+        visualView.stopAnimating()
+        visualView.configure(kind: .none)
         titleLabel.stringValue = headerText
         progressLabel.stringValue = ""
         buttonStack.views.forEach { buttonStack.removeView($0) }
@@ -149,6 +150,7 @@ final class OverlayViewController: NSViewController {
     }
 
     func stop() {
+        visualView.stopAnimating()
         countdownTimer?.invalidate()
         countdownTimer = nil
         playbackTimer?.invalidate()
