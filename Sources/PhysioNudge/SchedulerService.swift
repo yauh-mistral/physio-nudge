@@ -76,6 +76,12 @@ final class SchedulerService {
         reschedule()
     }
 
+    /// Presents the first enabled nudge immediately (manual trigger).
+    func triggerNow() {
+        guard let nudge = store.nudges.first(where: { $0.enabled }) else { return }
+        fire(nudge: nudge)
+    }
+
     func reschedule() {
         timer?.invalidate()
         let pairs = scheduler.nextFireDates(nudges: store.nudges)
@@ -84,8 +90,13 @@ final class SchedulerService {
             return
         }
         let interval = max(1, next.fireDate.timeIntervalSinceNow)
+        let formatter = DateFormatter()
+        formatter.dateStyle = .none
+        formatter.timeStyle = .medium
+        print("[PhysioNudge] scheduler: next '\(next.nudge.name)' at \(formatter.string(from: next.fireDate)) (in \(Int(interval)) s)")
         timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: false) { [weak self] _ in
             DispatchQueue.main.async {
+                print("[PhysioNudge] scheduler: firing '\(next.nudge.name)'")
                 self?.fire(nudge: next.nudge)
                 self?.reschedule()
             }
@@ -97,7 +108,10 @@ final class SchedulerService {
 
     private func fire(nudge: Nudge) {
         guard let profile = store.library.profile(id: nudge.profileId),
-              !profile.entries.isEmpty else { return }
+              !profile.entries.isEmpty else {
+            print("[PhysioNudge] scheduler: nudge '\(nudge.name)' has no usable profile — skipped")
+            return
+        }
         queue.enqueue(nudge)
         presentNextIfIdle()
     }
