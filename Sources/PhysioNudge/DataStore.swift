@@ -1,9 +1,27 @@
 import Foundation
 
+enum ExerciseType: String, Codable, CaseIterable {
+    case mobility
+    case strength
+    case stretch
+
+    var displayName: String {
+        switch self {
+        case .mobility: return "Mobility"
+        case .strength: return "Strength"
+        case .stretch: return "Stretch"
+        }
+    }
+}
+
 struct Exercise: Codable {
     var id: String
     var title: String
-    /// Schematic visual kind: "nod", "shake", "tilt", or nil for none.
+    var description: String
+    var type: ExerciseType?
+    /// Static depiction file (png/gif/jpeg) in the Images folder; user-replaceable.
+    var image: String?
+    /// Schematic fallback visual kind: "nod", "shake", "tilt", or nil.
     var visual: String?
 }
 
@@ -135,7 +153,9 @@ struct AppSettings: Codable {
 /// One resolved playback item for the overlay: exercise title + amount.
 struct OverlayItem {
     let title: String
+    let description: String
     let visual: String?
+    let image: String?
     let reps: Int?
     let seconds: Int?
 }
@@ -146,6 +166,7 @@ final class DataStore {
     static let shared = DataStore()
 
     let directory: URL
+    let imagesDirectory: URL
     private(set) var library: ExerciseLibrary
     private(set) var nudges: [Nudge]
     private(set) var settings: AppSettings
@@ -159,7 +180,10 @@ final class DataStore {
                                                 in: .userDomainMask).first
             ?? FileManager.default.homeDirectoryForCurrentUser
         directory = support.appendingPathComponent("PhysioNudge", isDirectory: true)
+        imagesDirectory = directory.appendingPathComponent("Images", isDirectory: true)
         try? FileManager.default.createDirectory(at: directory,
+                                                 withIntermediateDirectories: true)
+        try? FileManager.default.createDirectory(at: imagesDirectory,
                                                  withIntermediateDirectories: true)
         libraryURL = directory.appendingPathComponent("library.json")
         nudgesURL = directory.appendingPathComponent("nudges.json")
@@ -194,9 +218,15 @@ final class DataStore {
     private static func seedLibrary() -> ExerciseLibrary {
         ExerciseLibrary(
             exercises: [
-                Exercise(id: "head-nod", title: "Head Nod", visual: "nod"),
-                Exercise(id: "head-shake", title: "Head Shake", visual: "shake"),
-                Exercise(id: "ear-to-shoulder", title: "Ear to Shoulder", visual: "tilt")
+                Exercise(id: "head-nod", title: "Head Nods",
+                         description: "Move the head up and down, nodding slowly.",
+                         type: .mobility, image: nil, visual: "nod"),
+                Exercise(id: "head-shake", title: "Head Shake",
+                         description: "Turn the head left and right, shoulders stay still.",
+                         type: .mobility, image: nil, visual: "shake"),
+                Exercise(id: "ear-to-shoulder", title: "Ear to Shoulder",
+                         description: "Tilt the ear toward the shoulder, alternating sides.",
+                         type: .mobility, image: nil, visual: "tilt")
             ],
             profiles: [
                 Profile(id: "cervical-mobility", name: "Cervical Mobility", entries: [
@@ -228,6 +258,15 @@ final class DataStore {
         persistLibrary()
     }
 
+    func update(exercise: Exercise) {
+        if let index = library.exercises.firstIndex(where: { $0.id == exercise.id }) {
+            library.exercises[index] = exercise
+        } else {
+            library.exercises.append(exercise)
+        }
+        persistLibrary()
+    }
+
     func remove(exercise: Exercise) {
         library.exercises.removeAll { $0.id == exercise.id }
         persistLibrary()
@@ -245,6 +284,29 @@ final class DataStore {
             library.profiles.append(profile)
         }
         persistLibrary()
+    }
+
+    // MARK: - Images
+
+    /// Copies a user-chosen image into the Images folder and returns the stored name.
+    @discardableResult
+    func importImage(at sourceURL: URL) -> String? {
+        let ext = sourceURL.pathExtension.isEmpty ? "png" : sourceURL.pathExtension
+        let name = UUID().uuidString + "." + ext
+        let destination = imagesDirectory.appendingPathComponent(name)
+        do {
+            try? FileManager.default.removeItem(at: destination)
+            try FileManager.default.copyItem(at: sourceURL, to: destination)
+            return name
+        } catch {
+            return nil
+        }
+    }
+
+    func imageURL(for imageName: String?) -> URL? {
+        guard let imageName = imageName else { return nil }
+        let url = imagesDirectory.appendingPathComponent(imageName)
+        return FileManager.default.fileExists(atPath: url.path) ? url : nil
     }
 
     // MARK: - Nudges / settings mutation
