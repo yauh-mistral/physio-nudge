@@ -5,7 +5,11 @@ import AppKit
 /// Profiles: list + editor (name, entries with per-entry amount);
 /// add existing or new exercises, edit amounts, remove entries, save.
 final class LibraryWindowController: NSWindowController, NSWindowDelegate {
-    private let tabView = NSTabView(tabViewType: .topTabsBezelBorder)
+    private let tabView: NSTabView = {
+        let view = NSTabView()
+        view.tabViewType = .topTabsBezelBorder
+        return view
+    }()
 
     // Exercises tab
     private let exerciseTable = NSTableView()
@@ -224,8 +228,7 @@ final class LibraryWindowController: NSWindowController, NSWindowDelegate {
         let row = exerciseTable.selectedRow
         guard row >= 0, row < DataStore.shared.library.exercises.count else { return }
         let exercise = DataStore.shared.library.exercises[row]
-        DataStore.shared.library.exercises.removeAll { $0.id == exercise.id }
-        DataStore.shared.persistLibrary()
+        DataStore.shared.remove(exercise: exercise)
         reload()
     }
 

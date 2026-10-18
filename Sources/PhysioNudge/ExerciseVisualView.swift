@@ -147,7 +147,7 @@ final class ExerciseVisualView: NSView {
                               y: tip.y + sin(angle - 0.4) * length))
         path.line(to: NSPoint(x: tip.x + cos(angle + 0.4) * length,
                               y: tip.y + sin(angle + 0.4) * length))
-        path.closePath()
+        path.close()
         path.fill()
     }
 }
