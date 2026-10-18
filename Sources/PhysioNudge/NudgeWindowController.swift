@@ -3,7 +3,9 @@ import AppKit
 /// Configure Nudges window: list of nudges (profile + schedule), create,
 /// edit, delete. Schedule for now: regular interval (typed minutes);
 /// richer schedules (fixed times, hourly windows) come later.
-/// "New Profile…" jumps to the Library with a fresh profile editor open.
+/// Every change saves automatically. "New Profile…" jumps to the Library
+/// with a fresh profile editor open; "Trigger Now" fires the nudge
+/// immediately for testing.
 final class NudgeWindowController: NSWindowController {
     private let tableView = NSTableView()
     private let addButton = NSButton(title: "+", target: nil, action: nil)
@@ -15,7 +17,7 @@ final class NudgeWindowController: NSWindowController {
     private let typePopup = NSPopUpButton()
     private let minutesField = NSTextField()
     private let enabledCheck = NSButton(checkboxWithTitle: "Enabled", target: nil, action: nil)
-    private let applyButton = NSButton(title: "Apply", target: nil, action: nil)
+    private let triggerNowButton = NSButton(title: "Trigger Now", target: nil, action: nil)
 
     private var selectedNudge: Nudge?
 
@@ -72,6 +74,14 @@ final class NudgeWindowController: NSWindowController {
 
         nameField.placeholderString = "Hourly cervical"
         minutesField.placeholderString = "60"
+        nameField.target = self
+        nameField.action = #selector(fieldChanged)
+        minutesField.target = self
+        minutesField.action = #selector(fieldChanged)
+        enabledCheck.target = self
+        enabledCheck.action = #selector(fieldChanged)
+        profilePopup.target = self
+        profilePopup.action = #selector(fieldChanged)
         typePopup.addItems(withTitles: ["Regular interval"])
 
         newProfileButton.bezelStyle = .rounded
@@ -79,10 +89,10 @@ final class NudgeWindowController: NSWindowController {
         newProfileButton.target = self
 
         enabledCheck.setButtonType(.switch)
-        applyButton.bezelStyle = .rounded
-        applyButton.action = #selector(applyChanges)
-        applyButton.target = self
-        applyButton.isEnabled = false
+        triggerNowButton.bezelStyle = .rounded
+        triggerNowButton.action = #selector(triggerNowClicked)
+        triggerNowButton.target = self
+        triggerNowButton.isEnabled = false
 
         let editorGrid = NSGridView(views: [
             [NSTextField(labelWithString: "Name:"), nameField],
@@ -99,7 +109,7 @@ final class NudgeWindowController: NSWindowController {
         editorStack.spacing = 10
         editorStack.addArrangedSubview(editorGrid)
         editorStack.addArrangedSubview(enabledCheck)
-        editorStack.addArrangedSubview(applyButton)
+        editorStack.addArrangedSubview(triggerNowButton)
 
         let editorBox = NSBox()
         editorBox.title = "Edit"
@@ -151,7 +161,11 @@ final class NudgeWindowController: NSWindowController {
         (NSApp.delegate as? AppDelegate)?.schedulerDidReschedule()
     }
 
-    @objc private func applyChanges() {
+    @objc private func triggerNowClicked() {
+        (NSApp.delegate as? AppDelegate)?.triggerNudgeNow()
+    }
+
+    @objc private func fieldChanged() {
         guard var nudge = selectedNudge else { return }
         nudge.name = nameField.stringValue.isEmpty ? "Nudge" : nameField.stringValue
         nudge.profileId = profilePopup.selectedItem?.representedObject as? String ?? nudge.profileId
@@ -168,7 +182,7 @@ final class NudgeWindowController: NSWindowController {
     private func clearEditor() {
         nameField.stringValue = ""
         enabledCheck.state = .off
-        applyButton.isEnabled = false
+        triggerNowButton.isEnabled = false
         deleteButton.isEnabled = false
     }
 
@@ -187,13 +201,14 @@ final class NudgeWindowController: NSWindowController {
         enabledCheck.state = nudge.enabled ? .on : .off
         typePopup.selectItem(at: 0)
         minutesField.stringValue = "\(nudge.schedule.intervalMinutes ?? 60)"
-        applyButton.isEnabled = true
+        triggerNowButton.isEnabled = true
         deleteButton.isEnabled = true
     }
 
     func reload() {
         tableView.reloadData()
         deleteButton.isEnabled = selectedNudge != nil
+        triggerNowButton.isEnabled = selectedNudge != nil
     }
 }
 
@@ -217,7 +232,7 @@ extension NudgeWindowController: NSTableViewDataSource, NSTableViewDelegate {
         guard row >= 0, row < DataStore.shared.nudges.count else {
             selectedNudge = nil
             deleteButton.isEnabled = false
-            applyButton.isEnabled = false
+            triggerNowButton.isEnabled = false
             return
         }
         let nudge = DataStore.shared.nudges[row]
