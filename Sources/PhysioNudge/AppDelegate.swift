@@ -13,7 +13,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let overlaySize = NSSize(width: 300, height: 300)
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        print("[PhysioNudge] launching…")
         setupStatusItem()
+        print("[PhysioNudge] menu bar icon ready; library: \(DataStore.shared.library.exercises.count) exercises, \(DataStore.shared.library.profiles.count) profiles; nudges: \(DataStore.shared.nudges.count)")
 
         schedulerService.onPresent = { [weak self] profile in
             self?.present(profileName: profile.name, items: Self.overlayItems(for: profile))
@@ -26,7 +28,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let exercise = DataStore.shared.library.exercise(id: entry.exerciseId) else {
                 return nil
             }
-            return OverlayItem(title: exercise.title, reps: entry.reps, seconds: entry.seconds)
+            return OverlayItem(title: exercise.title,
+                               visual: exercise.visual,
+                               reps: entry.reps,
+                               seconds: entry.seconds)
         }
     }
 
@@ -145,8 +150,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         overlayController = controller
 
         controller.present(header: profileName,
-                       items: items,
-                       autoDelaySeconds: 10) { [weak self] _ in
+                           items: items,
+                           autoDelaySeconds: 10) { [weak self] _ in
             self?.dismissOverlay()
             completion(false)
         }

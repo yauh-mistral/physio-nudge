@@ -215,7 +215,7 @@ final class LibraryWindowController: NSWindowController, NSWindowDelegate {
     @objc private func addExerciseClicked() {
         let title = exerciseField.stringValue.trimmingCharacters(in: .whitespaces)
         guard !title.isEmpty else { return }
-        DataStore.shared.add(exercise: Exercise(id: UUID().uuidString, title: title))
+        DataStore.shared.add(exercise: Exercise(id: UUID().uuidString, title: title, visual: nil))
         exerciseField.stringValue = ""
         reload()
     }
@@ -267,7 +267,7 @@ final class LibraryWindowController: NSWindowController, NSWindowDelegate {
         guard let title = Self.promptText(title: "New Exercise",
                                           message: "Title of the new exercise:"),
               !title.isEmpty else { return }
-        let exercise = Exercise(id: UUID().uuidString, title: title)
+        let exercise = Exercise(id: UUID().uuidString, title: title, visual: nil)
         DataStore.shared.add(exercise: exercise)
         guard var profile = selectedProfile else { return }
         profile.entries.append(ProfileEntry(exerciseId: exercise.id, reps: nil, seconds: nil))
