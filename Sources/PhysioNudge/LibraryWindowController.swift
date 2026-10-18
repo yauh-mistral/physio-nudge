@@ -235,6 +235,191 @@ final class LibraryWindowController: NSWindowController, NSWindowDelegate {
         beginNewProfile()
     }
 
-    @objc private fun
-  }
+    @objc private func addEntryClicked() {
+        guard selectedProfile != nil else { return }
+        let menu = NSMenu()
+        for exercise in DataStore.shared.library.exercises {
+            let item = NSMenuItem(title: exercise.title,
+                                  action: #selector(entryExercisePicked(_:)),
+                                  keyEquivalent: "")
+            item.target = self
+            item.representedObject = exercise.id
+            menu.addItem(item)
+        }
+        let addNew = NSMenuItem(title: "New Exercise…",
+                                action: #selector(entryNewExercisePicked),
+                                keyEquivalent: "")
+        addNew.target = self
+        menu.addItem(addNew)
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: 0), in: addEntryButton)
+    }
+
+    @objc private func entryExercisePicked(_ sender: NSMenuItem) {
+        guard let profile = selectedProfile,
+              let exerciseId = sender.representedObject as? String else { return }
+        var updated = profile
+        updated.entries.append(ProfileEntry(exerciseId: exerciseId, reps: nil, seconds: nil))
+        selectedProfile = updated
+        reload()
+    }
+
+    @objc private func entryNewExercisePicked() {
+        guard let title = Self.promptText(title: "New Exercise",
+                                          message: "Title of the new exercise:"),
+              !title.isEmpty else { return }
+        let exercise = Exercise(id: UUID().uuidString, title: title, visual: nil)
+        DataStore.shared.add(exercise: exercise)
+        guard var profile = selectedProfile else { return }
+        profile.entries.append(ProfileEntry(exerciseId: exercise.id, reps: nil, seconds: nil))
+        selectedProfile = profile
+        reload()
+    }
+
+    @objc private func editAmountClicked() {
+        guard var profile = selectedProfile else { return }
+        let row = entriesTable.selectedRow
+        guard row >= 0, row < profile.entries.count else {
+            Self.showInfo(title: "Edit Amount",
+                          message: "Select an entry in the list first.")
+            return
+        }
+        let entry = profile.entries[row]
+        let exerciseTitle = DataStore.shared.library.exercise(id: entry.exerciseId)?.title ?? "Exercise"
+        let current = entry.reps != nil ? "\(entry.reps!)" : "\(entry.seconds ?? 0)s"
+        guard let text = Self.promptText(title: "Edit \(exerciseTitle)",
+                                         message: "Amount: plain number = reps (e.g. '10'). Or seconds with 's' (e.g. '30s').",
+                                         defaultValue: current) else { return }
+        let normalized = text.trimmingCharacters(in: .whitespaces).lowercased()
+        if normalized.hasSuffix("s"), let seconds = Int(normalized.dropLast()) {
+            profile.entries[row] = ProfileEntry(exerciseId: entry.exerciseId, reps: nil, seconds: seconds)
+        } else if let reps = Int(normalized) {
+            profile.entries[row] = ProfileEntry(exerciseId: entry.exerciseId, reps: reps, seconds: nil)
+        } else {
+            return
+        }
+        selectedProfile = profile
+        reload()
+    }
+
+    @objc private func removeEntryClicked() {
+        guard var profile = selectedProfile else { return }
+        let row = entriesTable.selectedRow
+        guard row >= 0, row < profile.entries.count else { return }
+        profile.entries.remove(at: row)
+        selectedProfile = profile
+        reload()
+    }
+
+    @objc private func saveProfileClicked() {
+        guard var profile = selectedProfile else { return }
+        profile.name = profileNameField.stringValue.isEmpty ? "Profile" : profileNameField.stringValue
+        DataStore.shared.update(profile: profile)
+        selectedProfile = profile
+        reload()
+    }
+
+    // MARK: - Helpers
+
+    private static func promptText(title: String,
+                                   message: String,
+                                   defaultValue: String = "") -> String? {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = message
+        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: "Cancel")
+        let input = NSTextField(frame: NSRect(x: 0, y: 0, width: 240, height: 24))
+        input.stringValue = defaultValue
+        alert.accessoryView = input
+        guard alert.runModal() == .alertFirstButtonReturn else { return nil }
+        return input.stringValue
+    }
+
+    private static func showInfo(title: String, message: String) {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = message
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
+    }
+
+    // MARK: - Data
+
+    private var exercises: [Exercise] { DataStore.shared.library.exercises }
+    private var profiles: [Profile] { DataStore.shared.library.profiles }
+
+    func reload() {
+        exerciseTable.reloadData()
+        profileTable.reloadData()
+        entriesTable.reloadData()
+        let hasProfile = selectedProfile != nil
+        addEntryButton.isEnabled = hasProfile
+        editAmountButton.isEnabled = hasProfile
+        removeEntryButton.isEnabled = hasProfile
+        saveProfileButton.isEnabled = hasProfile
+    }
+
+    func select(profile: Profile) {
+        isSelectingProgrammatically = true
+        selectedProfile = profile
+        profileNameField.stringValue = profile.name
+        reload()
+        if let index = profiles.firstIndex(where: { $0.id == profile.id }) {
+            profileTable.selectRowIndexes(IndexSet(integer: index), byExtendingSelection: false)
+        }
+        isSelectingProgrammatically = false
+    }
+
+    func beginNewProfile() {
+        selectedProfile = Profile(id: UUID().uuidString, name: "New Profile", entries: [])
+        profileNameField.stringValue = "New Profile"
+        reload()
+        tabView.selectTabViewItem(at: 1)
+    }
+}
+
+extension LibraryWindowController: NSTableViewDataSource, NSTableViewDelegate {
+    func numberOfRows(in tableView: NSTableView) -> Int {
+        if tableView == exerciseTable {
+            return exercises.count
+        }
+        if tableView == profileTable {
+            return profiles.count
+        }
+        return selectedProfile?.entries.count ?? 0
+    }
+
+    func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+        let cell = tableView.makeView(withIdentifier: NSUserInterfaceItemIdentifier("cell"),
+                                       owner: self) as? NSTextField
+            ?? NSTextField(labelWithString: "")
+        if tableView == exerciseTable {
+            cell.stringValue = exercises[row].title
+        } else if tableView == profileTable {
+            cell.stringValue = profiles[row].name
+        } else if let profile = selectedProfile, row < profile.entries.count {
+            let entry = profile.entries[row]
+            let title = DataStore.shared.library.exercise(id: entry.exerciseId)?.title ?? "?"
+            if let reps = entry.reps {
+                cell.stringValue = "\(reps)x \(title)"
+            } else if let seconds = entry.seconds {
+                cell.stringValue = "\(seconds) s \(title)"
+            } else {
+                cell.stringValue = "\(title) — no amount yet"
+            }
+        }
+        return cell
+    }
+
+    func tableViewSelectionDidChange(_ notification: Notification) {
+        guard let table = notification.object as? NSTableView else { return }
+        if table == profileTable {
+            // Guard against re-entrant selection events caused by our own
+            // programmatic selectRowIndexes during reloadData (crash fix).
+            if isSelectingProgrammatically { return }
+            let row = profileTable.selectedRow
+            guard row >= 0, row < profiles.count else { return }
+            select(profile: profiles[row])
+        }
+    }
 }
