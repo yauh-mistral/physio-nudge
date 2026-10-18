@@ -1,8 +1,8 @@
 import AppKit
 
 /// Configure Nudges window: list of nudges (profile + schedule), create,
-/// edit, delete. Schedule for now: regular interval (typed minutes,
-/// default 60); richer schedules (fixed times, hourly windows) come later.
+/// edit, delete. Schedule for now: regular interval (typed minutes);
+/// richer schedules (fixed times, hourly windows) come later.
 /// Every change saves automatically. "New Profile…" jumps to the Library
 /// with a fresh profile editor open; "Trigger Now" fires the nudge
 /// immediately for testing.
@@ -73,11 +73,15 @@ final class NudgeWindowController: NSWindowController {
         listBox.contentView = listStack
 
         nameField.placeholderString = "Hourly cervical"
+        minutesField.placeholderString = "60"
         nameField.target = self
         nameField.action = #selector(fieldChanged)
         minutesField.target = self
         minutesField.action = #selector(fieldChanged)
-        minutesField.placeholderString = "60"
+        enabledCheck.target = self
+        enabledCheck.action = #selector(fieldChanged)
+        profilePopup.target = self
+        profilePopup.action = #selector(fieldChanged)
         typePopup.addItems(withTitles: ["Regular interval"])
 
         newProfileButton.bezelStyle = .rounded
@@ -85,10 +89,6 @@ final class NudgeWindowController: NSWindowController {
         newProfileButton.target = self
 
         enabledCheck.setButtonType(.switch)
-        enabledCheck.target = self
-        enabledCheck.action = #selector(fieldChanged)
-        profilePopup.target = self
-        profilePopup.action = #selector(fieldChanged)
         triggerNowButton.bezelStyle = .rounded
         triggerNowButton.action = #selector(triggerNowClicked)
         triggerNowButton.target = self
@@ -161,6 +161,10 @@ final class NudgeWindowController: NSWindowController {
         (NSApp.delegate as? AppDelegate)?.schedulerDidReschedule()
     }
 
+    @objc private func triggerNowClicked() {
+        (NSApp.delegate as? AppDelegate)?.triggerNudgeNow()
+    }
+
     @objc private func fieldChanged() {
         guard var nudge = selectedNudge else { return }
         nudge.name = nameField.stringValue.isEmpty ? "Nudge" : nameField.stringValue
@@ -171,12 +175,8 @@ final class NudgeWindowController: NSWindowController {
                                   fromTime: nil, toTime: nil, times: nil)
         DataStore.shared.update(nudges: DataStore.shared.nudges.map { $0.id == nudge.id ? nudge : $0 })
         selectedNudge = nudge
-        tableView.reloadData()
+        reload()
         (NSApp.delegate as? AppDelegate)?.schedulerDidReschedule()
-    }
-
-    @objc private func triggerNowClicked() {
-        (NSApp.delegate as? AppDelegate)?.triggerNudgeNow()
     }
 
     private func clearEditor() {
