@@ -228,6 +228,11 @@ final class DataStore {
         persistLibrary()
     }
 
+    func remove(exercise: Exercise) {
+        library.exercises.removeAll { $0.id == exercise.id }
+        persistLibrary()
+    }
+
     func add(profile: Profile) {
         library.profiles.append(profile)
         persistLibrary()
