@@ -1,8 +1,9 @@
 import AppKit
 
 /// Configure Nudges window: list of nudges (profile + schedule), create,
-/// edit, delete. Schedule: regular interval (typed minutes, default 60);
-/// every change saves automatically. "New Profile…" jumps to the Library
+/// edit, delete. Schedule for now: regular interval (typed minutes,
+/// default 60); richer schedules (fixed times, hourly windows) come later.
+/// Every change saves automatically. "New Profile…" jumps to the Library
 /// with a fresh profile editor open; "Trigger Now" fires the nudge
 /// immediately for testing.
 final class NudgeWindowController: NSWindowController {
@@ -78,8 +79,6 @@ final class NudgeWindowController: NSWindowController {
         minutesField.action = #selector(fieldChanged)
         minutesField.placeholderString = "60"
         typePopup.addItems(withTitles: ["Regular interval"])
-        typePopup.action = #selector(scheduleTypeChanged)
-        typePopup.target = self
 
         newProfileButton.bezelStyle = .rounded
         newProfileButton.action = #selector(newProfileClicked)
@@ -131,16 +130,6 @@ final class NudgeWindowController: NSWindowController {
             split.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 12),
             split.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12),
         ])
-
-        showScheduleFields()
-    }
-
-    private func showScheduleFields() {
-        minutesField.isHidden = false
-    }
-
-    @objc private func scheduleTypeChanged() {
-        showScheduleFields()
     }
 
     @objc private func newProfileClicked() {
@@ -212,7 +201,6 @@ final class NudgeWindowController: NSWindowController {
         enabledCheck.state = nudge.enabled ? .on : .off
         typePopup.selectItem(at: 0)
         minutesField.stringValue = "\(nudge.schedule.intervalMinutes ?? 60)"
-        showScheduleFields()
         triggerNowButton.isEnabled = true
         deleteButton.isEnabled = true
     }
