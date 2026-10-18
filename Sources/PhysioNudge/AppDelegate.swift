@@ -29,7 +29,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 return nil
             }
             return OverlayItem(title: exercise.title,
+                               description: exercise.description,
                                visual: exercise.visual,
+                               image: exercise.image,
                                reps: entry.reps,
                                seconds: entry.seconds)
         }
