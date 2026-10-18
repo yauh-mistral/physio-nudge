@@ -127,6 +127,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         schedulerService.reschedule()
     }
 
+    /// Manual trigger from the nudge editor ("Trigger Now").
+    func triggerNudgeNow() {
+        schedulerService.triggerNow()
+    }
+
     // MARK: - Overlay presentation
 
     private func present(profileName: String, items: [OverlayItem]) {
